@@ -196,7 +196,7 @@ Comment=Shall we play a game? NORAD war-room terminal for Ollama
 Exec=$APP/wopr
 Icon=$APP/public/emblem.svg
 Terminal=false
-Categories=Utility;Game;
+Categories=Game;
 EOF
   ok "menu entry W.O.P.R."
 fi
