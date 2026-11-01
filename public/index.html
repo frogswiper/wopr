@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W.O.P.R. // NORAD</title>
+<link rel="icon" href="emblem.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-blue">
+<div id="crt">
+
+  <!-- ============ BOOT ============ -->
+  <div id="boot">
+    <div id="splash">
+      <canvas id="splash-map"></canvas>
+      <div class="splash-title">
+        <div class="sp-word">W.O.P.R.</div>
+        <div class="sp-rule"></div>
+        <div class="sp-sub">WAR OPERATION PLAN RESPONSE</div>
+        <div class="sp-co">NORTH AMERICAN AEROSPACE DEFENSE COMMAND &middot; CHEYENNE MOUNTAIN COMPLEX</div>
+      </div>
+    </div>
+    <pre id="bootlog"></pre>
+    <div id="boot-skip">ANY KEY: SKIP SEQUENCE</div>
+  </div>
+
+  <!-- ============ MAIN ============ -->
+  <div id="main" hidden>
+    <header id="topbar">
+      <button class="drawer-btn" id="btn-left" title="Systems panel">SYS</button>
+      <div class="brand">
+        <svg class="emblem" viewBox="0 0 200 200" aria-hidden="true"><use href="#emblem"/></svg>
+        <span class="brand-word">W.O.P.R.</span>
+        <span class="brand-sub">WAR OPERATION PLAN RESPONSE</span>
+      </div>
+      <div class="tb-cell"><span class="lbl">DEFCON</span> <span id="tb-defcon" class="dc5">5</span></div>
+      <div class="tb-cell"><span class="lbl">NODE</span> <span id="tb-node">--</span></div>
+      <div class="tb-cell"><span class="lbl">LINK</span> <span id="tb-link" class="warn">DIALING</span></div>
+      <div class="tb-cell"><span class="lbl">UPTIME</span> <span id="tb-uptime">00:00:00</span></div>
+      <div class="tb-cell clock" id="tb-clock">--</div>
+      <div class="tb-tools">
+        <button id="btn-voice" title="Voice synthesizer">VOICE</button>
+        <button id="btn-theme" title="Phosphor colour">PHOSPHOR</button>
+        <button id="btn-sound" title="Sound effects">AUDIO</button>
+      </div>
+      <button class="drawer-btn" id="btn-right" title="Big board and configuration">NORAD</button>
+    </header>
+
+    <aside id="left" class="drawer">
+      <section class="panel">
+        <h2>STRATEGY MODULE <span class="h-note">model</span></h2>
+        <label class="field"><span>ACTIVE MODULE</span>
+          <select id="model"></select>
+        </label>
+        <dl id="model-info" class="kv"></dl>
+        <div class="row">
+          <button id="btn-rescan">RESCAN</button>
+          <button id="btn-unload" title="Release model from memory (keep_alive 0)">UNLOAD</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>W.O.P.R. CORE <span class="h-note" id="simcount">SIM 0000</span></h2>
+        <canvas id="lamps" width="300" height="96"></canvas>
+      </section>
+
+      <section class="panel">
+        <h2>ACTIVE CORES <span class="h-note">/api/ps</span></h2>
+        <div id="ps" class="ps"></div>
+      </section>
+
+      <section class="panel">
+        <h2>TELEMETRY</h2>
+        <canvas id="scope" width="300" height="60"></canvas>
+        <dl id="telemetry" class="kv"></dl>
+        <div class="ctxbar"><div id="ctxfill"></div></div>
+        <div class="ctxlbl" id="ctxlbl">CONTEXT 0 / 0</div>
+      </section>
+
+      <section class="panel grow">
+        <h2>GAME LOGS</h2>
+        <div class="row"><button id="btn-new">+ NEW GAME</button><button id="btn-games">LIST GAMES</button><button id="btn-export">EXPORT</button></div>
+        <ul id="sessions"></ul>
+      </section>
+    </aside>
+
+    <main id="center">
+      <div class="center-head">
+        <span>TERMINAL // <span id="session-title">--</span></span>
+        <span class="mode">MODE: <span id="mode">STANDBY</span></span>
+      </div>
+      <div id="log" aria-live="polite"></div>
+      <form id="cmd" autocomplete="off">
+        <span class="prompt">&gt;</span>
+        <textarea id="input" rows="1" spellcheck="false" placeholder="TYPE A MESSAGE, LIST GAMES OR /HELP"></textarea>
+        <button type="submit" id="btn-send">TRANSMIT</button>
+        <button type="button" id="btn-abort" hidden>ABORT</button>
+      </form>
+    </main>
+
+    <aside id="right" class="drawer">
+      <section class="panel board-panel">
+        <h2>BIG BOARD <span class="h-note" id="board-label">NORAD // CRYSTAL PALACE</span></h2>
+        <canvas id="board" width="320" height="170"></canvas>
+        <div id="defcon" class="defcon" title="Defense readiness condition">
+          <span data-l="5">5</span><span data-l="4">4</span><span data-l="3">3</span><span data-l="2">2</span><span data-l="1">1</span>
+          <b>DEFCON</b>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>VOICE SYNTHESIZER <span class="h-note" id="v-engine-note">--</span></h2>
+        <label class="field inline"><span>ENGINE</span>
+          <select id="v-engine">
+            <option value="auto">AUTO</option>
+            <option value="server">ESPEAK (LOCAL)</option>
+            <option value="browser">BROWSER SPEECH</option>
+          </select>
+        </label>
+        <label class="field inline"><span>VOICE</span><select id="v-voice"></select></label>
+        <div id="vparams"></div>
+        <div class="row">
+          <button id="btn-vtest">TEST</button>
+          <button id="btn-vstop">SILENCE</button>
+          <button id="btn-vreset">RESET VOICE</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>PRIME DIRECTIVE <span class="h-note">system</span></h2>
+        <label class="field inline"><span>OPERATOR</span><input type="text" id="opname" spellcheck="false"></label>
+        <textarea id="system" rows="6" spellcheck="false"></textarea>
+        <div class="row"><button id="btn-sysreset">RESTORE DEFAULT</button></div>
+      </section>
+
+      <section class="panel">
+        <h2>PARAMETERS <span class="h-note">options</span></h2>
+        <div id="params"></div>
+        <label class="field inline"><span>KEEP ALIVE</span>
+          <select id="keepalive">
+            <option value="0">0 (UNLOAD NOW)</option>
+            <option value="5m">5 MIN</option>
+            <option value="30m">30 MIN</option>
+            <option value="1h">1 HOUR</option>
+            <option value="-1">INDEFINITE</option>
+          </select>
+        </label>
+        <label class="check" id="think-wrap"><input type="checkbox" id="think"> <span>STRATEGIC ANALYSIS (THINK)</span></label>
+        <div class="row"><button id="btn-optreset">RESET PARAMETERS</button></div>
+      </section>
+    </aside>
+
+    <footer id="bottombar">
+      <span id="threat">STATUS: <b>AWAITING FIRST MOVE</b></span>
+      <span class="hints">ENTER TRANSMIT &middot; SHIFT+ENTER NEWLINE &middot; ESC ABORT / LOGOFF &middot; &uarr;&darr; RECALL &middot; LIST GAMES &middot; /HELP</span>
+      <span id="foot-node">--</span>
+    </footer>
+  </div>
+
+  <!-- ============ WAR ROOM (full-screen simulations) ============ -->
+  <div id="theater" hidden>
+    <canvas id="theater-map"></canvas>
+    <div id="th-top"></div>
+    <div id="th-big"></div>
+    <div id="th-bottom"></div>
+    <div id="th-defcon"></div>
+    <div id="th-screen" hidden><pre></pre></div>
+    <div id="th-skip">ESC: ABORT SIMULATION</div>
+  </div>
+
+  <div id="scan"></div>
+  <div id="vignette"></div>
+</div>
+
+<!-- Emblem: polar-projection globe (NORAD big board) with the NORAD star -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="emblem" fill="none" stroke="currentColor">
+      <circle cx="100" cy="100" r="92" stroke-width="5"/>
+      <g class="ring" stroke-width="2.5">
+        <circle cx="100" cy="100" r="68"/>
+        <circle cx="100" cy="100" r="44"/>
+        <circle cx="100" cy="100" r="20"/>
+        <path d="M100 8v184M8 100h184M35 35l130 130M165 35L35 165"/>
+      </g>
+      <path d="M100 58l9.9 30.4h32l-25.9 18.8 9.9 30.4L100 118.8l-25.9 18.8 9.9-30.4-25.9-18.8h32z" stroke-width="4" fill="currentColor" fill-opacity=".25"/>
+    </g>
+  </defs>
+</svg>
+
+<script src="worldmap.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

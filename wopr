@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Start the W.O.P.R. terminal server (if not already up) and open it full screen in its own window.
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+# Optional config written by install.sh: WOPR_MODEL, WOPR_NODE, WOPR_PORT, WOPR_TTS, OLLAMA_URL ...
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/wopr/wopr.env"
+if [ -f "$CONF" ]; then set -a; . "$CONF"; set +a; fi
+
+PORT="${WOPR_PORT:-1983}"
+URL="http://127.0.0.1:$PORT/"
+NODE="${WOPR_NODE:-node}"
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/wopr.log"
+mkdir -p "$(dirname "$LOG")"
+
+if ! curl -s -o /dev/null "${URL}wopr.json"; then
+  nohup "$NODE" "$DIR/server.js" > "$LOG" 2>&1 &
+  for _ in $(seq 25); do curl -s -o /dev/null "${URL}wopr.json" && break; sleep 0.2; done
+fi
+
+# Kiosk window with a dedicated browser profile: separate window, full screen, no browser chrome,
+# and audio allowed without a click so Joshua can speak first. Leave with Alt+F4.
+# WOPR_BROWSER=default opens a normal tab in the default browser instead.
+open_default() {
+  if command -v xdg-open >/dev/null; then xdg-open "$URL" >/dev/null 2>&1 &
+  elif command -v open >/dev/null; then open "$URL"
+  else echo "W.O.P.R. is running at $URL"; fi
+}
+
+if [ "${WOPR_BROWSER:-}" = "default" ]; then
+  open_default
+elif command -v firefox >/dev/null; then
+  # Snap Firefox cannot read hidden directories, so its profile lives under ~/snap.
+  # Ubuntu's /usr/bin/firefox is a shell wrapper around /snap/bin/firefox, not a symlink.
+  ff="$(command -v firefox)"
+  if readlink -f "$ff" | grep -q '^/snap/' || { [ -x /snap/bin/firefox ] && grep -qs '/snap/bin/firefox' "$ff"; }; then
+    PROFILE="$HOME/snap/firefox/common/wopr-profile"
+  else
+    PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/firefox-profile"
+  fi
+  mkdir -p "$PROFILE"
+  cat > "$PROFILE/user.js" <<'PREFS'
+user_pref("media.autoplay.default", 0);
+user_pref("media.autoplay.blocking_policy", 0);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("trailhead.firstrun.didSeeAboutWelcome", true);
+user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("startup.homepage_welcome_url", "");
+user_pref("startup.homepage_welcome_url.additional", "");
+user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.tabs.warnOnClose", false);
+user_pref("browser.translations.automaticallyPopup", false);
+user_pref("signon.rememberSignons", false);
+user_pref("dom.allow_scripts_to_close_windows", true);
+PREFS
+  nohup firefox --profile "$PROFILE" --kiosk --new-window "$URL" >/dev/null 2>&1 &
+else
+  for b in chromium chromium-browser google-chrome google-chrome-stable brave-browser microsoft-edge; do
+    if command -v "$b" >/dev/null; then
+      nohup "$b" --user-data-dir="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/chromium-profile" \
+        --kiosk --app="$URL" --autoplay-policy=no-user-gesture-required \
+        --no-first-run --no-default-browser-check >/dev/null 2>&1 &
+      exit 0
+    fi
+  done
+  open_default
+fi
