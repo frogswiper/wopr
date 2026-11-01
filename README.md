@@ -5,7 +5,7 @@ logs on as **JOSHUA**, and **speaks** with a flat, word-by-word synthesizer voic
 says is *"SHALL WE PLAY A GAME?"*. Behind the 1983 front end, any local or Ollama cloud model does
 the talking. By default that is the newest **GLM cloud model**.
 
-## Install (one line)
+## Install on Linux / macOS (one line)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/frogswiper/wopr/main/install.sh | bash
@@ -34,6 +34,30 @@ Options (set them before `bash`, e.g. `curl … | WOPR_MODEL=glm-5.2:cloud bash`
 | `WOPR_NO_LAUNCH` | — | `1` = don't launch at the end |
 
 Settings are saved in `~/.config/wopr/wopr.env`. Run the one-liner again to update.
+
+## Install on Windows 10 / 11
+
+Open **PowerShell** (a normal window, not as administrator) and run:
+
+```powershell
+irm https://raw.githubusercontent.com/frogswiper/wopr/main/install.ps1 | iex
+```
+
+The Windows installer:
+
+1. installs **Ollama** if it isn't present (winget, or the official `OllamaSetup.exe`)
+2. starts the Ollama server if it isn't running
+3. runs `ollama signin`. If a link is shown, open it, approve, and the install continues
+4. finds the **newest GLM cloud model** on ollama.com and pulls it
+5. sets up **espeak-ng** for Joshua's voice. It unpacks the official Windows package without admin rights; only if that fails does it install it normally (one Windows permission prompt). Without it, Joshua uses Windows' own speech voices
+6. uses Node.js 18+ if it is installed; otherwise it downloads a checksum-verified Node 22
+   into `%LOCALAPPDATA%\wopr\node` (no admin)
+7. installs W.O.P.R. to `%LOCALAPPDATA%\wopr\app`, saves settings to `%APPDATA%\wopr\wopr.env`, adds
+   **Start Menu and desktop shortcuts** and the `wopr` command (new terminals), then launches it
+
+It opens full screen in its own **Edge** kiosk window (Chrome or Brave if Edge is missing), with
+autoplay allowed. Esc exits; Alt+F4 also works. Set options the same way as on Linux, e.g.
+`$env:WOPR_MODEL = 'glm-5.2:cloud'; irm … | iex`. Run the one-liner again to update.
 
 ## Run
 

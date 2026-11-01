@@ -41,11 +41,17 @@ const SEC_HEADERS = {
 };
 
 /* ---------------- speech synthesizer ---------------- */
+const WIN = process.platform === 'win32';
 function which(cmd) {
-  if (cmd.includes('/')) { try { fs.accessSync(cmd, fs.constants.X_OK); return cmd; } catch { return null; } }
+  const exts = WIN ? ['', ...(process.env.PATHEXT || '.EXE;.CMD;.BAT').toLowerCase().split(';')] : [''];
+  const ok = (p) => { try { fs.accessSync(p, fs.constants.X_OK); return fs.statSync(p).isFile(); } catch { return false; } };
+  if (path.isAbsolute(cmd) || cmd.includes('/') || cmd.includes(path.sep)) {
+    for (const e of exts) if (ok(cmd + e)) return cmd + e;
+    return null;
+  }
   for (const dir of (process.env.PATH || '').split(path.delimiter)) {
-    const p = path.join(dir, cmd);
-    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch { /* next */ }
+    if (!dir) continue;
+    for (const e of exts) { const p = path.join(dir, cmd + e); if (ok(p)) return p; }
   }
   return null;
 }
@@ -55,7 +61,7 @@ const TTS = (() => {
   const cands = [process.env.WOPR_TTS, 'espeak-ng', 'espeak'].filter(Boolean);
   for (const c of cands) {
     const bin = which(c);
-    if (bin && /say$/.test(bin)) return { kind: 'say', bin };
+    if (bin && /(^|[\\/])say$/.test(bin)) return { kind: 'say', bin };
     if (bin) return { kind: 'espeak', bin };
   }
   if (process.platform === 'darwin' && which('say')) return { kind: 'say', bin: which('say') };
@@ -71,6 +77,7 @@ function listVoices() {
   if (TTS.kind === 'say') return SAY_VOICES;
   const dirs = [
     process.env.ESPEAK_DATA_PATH && path.join(process.env.ESPEAK_DATA_PATH, 'espeak-ng-data/voices/!v'),
+    path.join(path.dirname(TTS.bin), 'espeak-ng-data/voices/!v'),
     '/usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v', '/usr/lib/aarch64-linux-gnu/espeak-ng-data/voices/!v',
     '/usr/share/espeak-ng-data/voices/!v', '/usr/lib/espeak-ng-data/voices/!v', '/usr/local/share/espeak-ng-data/voices/!v',
     '/opt/homebrew/share/espeak-ng-data/voices/!v', '/usr/share/espeak-data/voices/!v',
@@ -101,30 +108,35 @@ function say(req, res) {
     if (ttsBusy >= 3) { res.writeHead(503, SEC_HEADERS); return res.end(); }
     const voice = VOICES.includes(o.voice) ? o.voice : VOICES[0];
     const rate = clamp(o.rate, 80, 260, 140);
-    let args, out = null, tmp = null;
+    // Audio goes to a temp file, not stdout: Windows builds of espeak-ng can mangle binary stdout.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wopr-'));
+    const out = path.join(tmp, 'say.wav');
+    let args;
     if (TTS.kind === 'espeak') {
       args = ['-v', `en-us+${voice}`, '-s', String(rate), '-p', String(clamp(o.pitch, 0, 99, 32)),
-        '-P', String(clamp(o.range, 0, 99, 8)), '-g', String(clamp(o.gap, 0, 40, 6)), '-a', '170', '--stdin', '--stdout'];
+        '-P', String(clamp(o.range, 0, 99, 8)), '-g', String(clamp(o.gap, 0, 40, 6)), '-a', '170', '-w', out, '--stdin'];
     } else {
-      tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wopr-'));
-      out = path.join(tmp, 'say.wav');
       fs.writeFileSync(path.join(tmp, 'say.txt'), text);
       args = ['-v', voice, '-r', String(rate), '--data-format=LEI16@22050', '-o', out, '-f', path.join(tmp, 'say.txt')];
     }
     ttsBusy++;
-    const p = spawn(TTS.bin, args, { stdio: ['pipe', 'pipe', 'ignore'] });
-    const chunks = [];
+    const p = spawn(TTS.bin, args, { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true });
     const kill = setTimeout(() => p.kill('SIGKILL'), 20000);
-    p.stdout.on('data', (c) => chunks.push(c));
-    p.on('error', () => {});
-    p.on('close', (code) => {
+    let finished = false;
+    const finish = (code) => {
+      if (finished) return;
+      finished = true;
       clearTimeout(kill); ttsBusy--;
-      let wav = Buffer.concat(chunks);
-      if (out) { try { wav = fs.readFileSync(out); } catch { wav = Buffer.alloc(0); } fs.rmSync(tmp, { recursive: true, force: true }); }
+      let wav;
+      try { wav = fs.readFileSync(out); } catch { wav = Buffer.alloc(0); }
+      fs.rmSync(tmp, { recursive: true, force: true });
       if (code !== 0 || wav.length < 100) { res.writeHead(500, SEC_HEADERS); return res.end(); }
       res.writeHead(200, { 'content-type': 'audio/wav', 'cache-control': 'no-store', 'content-length': wav.length, ...SEC_HEADERS });
       res.end(wav);
-    });
+    };
+    p.on('error', () => finish(-1));
+    p.on('close', finish);
+    p.stdin.on('error', () => {});
     if (TTS.kind === 'espeak') p.stdin.end(text); else p.stdin.end();
     res.on('close', () => { if (!res.writableFinished) p.kill('SIGKILL'); });
   });

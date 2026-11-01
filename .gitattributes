@@ -1,0 +1,5 @@
+# Windows scripts keep their CRLF line endings
+*.ps1 -text
+*.cmd -text
+*.ico binary
+*.woff2 binary
