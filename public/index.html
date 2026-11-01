@@ -21,6 +21,12 @@
         <div class="sp-co">NORTH AMERICAN AEROSPACE DEFENSE COMMAND &middot; CHEYENNE MOUNTAIN COMPLEX</div>
       </div>
     </div>
+    <div id="zoomer" hidden>
+      <canvas id="zoom-map"></canvas>
+      <div id="zm-top"></div>
+      <div id="zm-tag"></div>
+      <div id="zm-bottom"></div>
+    </div>
     <pre id="bootlog"></pre>
     <div id="boot-skip">ANY KEY: SKIP SEQUENCE</div>
   </div>
@@ -109,6 +115,14 @@
         </div>
       </section>
 
+      <section class="panel wx-panel" id="wx-panel" title="Click: Joshua reads the weather">
+        <h2>WEATHER <span class="h-note" id="wx-place">--</span></h2>
+        <div class="wx-now"><span id="wx-temp">--°</span><span id="wx-cond">ACQUIRING</span></div>
+        <dl id="wx-kv" class="kv"></dl>
+        <div id="wx-hours" class="wx-hours"></div>
+        <div class="wx-foot"><span id="wx-time">--</span><span>OPEN-METEO</span></div>
+      </section>
+
       <section class="panel">
         <h2>VOICE SYNTHESIZER <span class="h-note" id="v-engine-note">--</span></h2>
         <label class="field inline"><span>ENGINE</span>
@@ -190,6 +204,7 @@
 </svg>
 
 <script src="worldmap.js"></script>
+<script src="detailmap.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

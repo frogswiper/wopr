@@ -72,7 +72,8 @@ starts after your first key press.
 
 ## What's inside
 
-- **Boot**: the NORAD big board, then the system log and a dial-up to the inference node. Then
+- **Boot**: the NORAD big board, then an LED-bitmap world that zooms in on your location (default
+  Hønefoss, Norway) until the target locks. Then the system log and a dial-up to the inference node. Then
   `LOGON: JOSHUA`, and *"SHALL WE PLAY A GAME?"*, typed and spoken.
 - **Terminal**: David's blue IMSAI screen. Every reply streams in upper case and is read aloud a
   sentence at a time.
@@ -83,6 +84,9 @@ starts after your first key press.
   browser's own speech.
 - **Big board**: a live NORAD map with the US in blue, the USSR in red and the rest of the world in
   green. W.O.P.R. runs war simulations on it while it thinks. Click it to watch full screen.
+- **Weather**: a small panel under the big board with temperature, conditions, wind and the next six
+  hours from [Open-Meteo](https://open-meteo.com) (no key). Click it and Joshua reads it out; ask him about
+  the weather and he knows. `/weather <place>` changes the location, which is also the intro zoom target.
 - **W.O.P.R. core**: the cabinet's indicator lamps. They blink harder while it thinks and talks.
 - **DEFCON** readiness display, plus panels for model, voice, prime directive, parameters and
   telemetry, and game logs saved in the browser.
@@ -114,7 +118,9 @@ Env vars: `WOPR_PORT` (1983), `WOPR_BIND` (127.0.0.1), `OLLAMA_URL` (http://127.
   `X-Wopr` header and a same-origin request.
 - Game logs and settings are stored in the browser's localStorage (`wopr.v1`).
 - `public/worldmap.js` is generated from Natural Earth 1:110m data (public domain) by
-  `tools/build-map.py`.
+  `tools/build-map.py`. `public/detailmap.js` is a 1:10m inset of southern Norway for the intro
+  zoom, built by `tools/build-detail.py`; other locations zoom on the 1:110m map.
+- The weather panel and `/weather` call `api.open-meteo.com` and `geocoding-api.open-meteo.com` from the browser.
 - Fonts: VT323 and Share Tech Mono, both SIL Open Font License (see `public/fonts/`).
 
 ---

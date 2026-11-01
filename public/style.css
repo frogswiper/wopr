@@ -101,6 +101,18 @@ button, select, textarea, input { font: inherit; color: inherit; }
 .sp-rule { width: min(70vw, 820px); height: 2px; margin: 2.2vh auto 1.6vh; background: var(--nb-text); box-shadow: 0 0 12px var(--nb-text); }
 .sp-sub { font: clamp(16px, 2.2vw, 30px) var(--ui); letter-spacing: .5em; margin-right: -.5em; color: var(--nb-text); text-shadow: 0 0 8px rgba(143, 216, 255, .6); }
 .sp-co { margin-top: 12px; font: 12px var(--ui); letter-spacing: .3em; color: #5d86b8; text-shadow: none; }
+/* intro zoom: LED bitmap world */
+#zoomer { position: absolute; inset: 0; z-index: 3; background: #000; overflow: hidden; }
+#zoomer canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+#zoomer.off { animation: splashOut .45s ease-in forwards; }
+#zm-top { position: absolute; left: 3vw; top: 3vh; background: rgba(0,4,16,.78); border: 1px solid #1d4f8f; padding: 8px 14px; font: clamp(12px, 1.2vw, 17px)/1.4 var(--ui); letter-spacing: .1em; color: var(--nb-text); white-space: pre; text-shadow: 0 0 6px rgba(143,216,255,.6), 0 0 2px #000; }
+#zm-tag { position: absolute; left: 0; top: 0; font: 22px/1.05 var(--term); color: #ffd0c0; white-space: pre; text-shadow: 0 0 6px #ff5a2a, 0 0 2px #000; letter-spacing: .08em; }
+#zm-bottom { position: absolute; left: 0; right: 0; bottom: 7vh; text-align: center; font: clamp(26px, 3.4vw, 54px)/1.25 var(--term); color: var(--nb-warn); white-space: pre; letter-spacing: .12em; text-shadow: 0 0 10px rgba(240,230,176,.7), 0 0 3px #000; }
+#zm-bottom:not(:empty) { animation: blink .5s steps(1) 3; }
+#zm-bottom:not(:empty), #zm-tag:not(:empty) { background: rgba(0,4,16,.78); }
+#zm-bottom:not(:empty) { left: 50%; right: auto; transform: translateX(-50%); padding: 6px 28px; border: 1px solid #6b5f2a; }
+#zm-tag:not(:empty) { padding: 2px 6px; }
+
 #bootlog {
   margin: 0; font: 22px/1.18 var(--term); color: var(--fg);
   white-space: pre-wrap; max-height: 100%; overflow: hidden;
@@ -356,3 +368,17 @@ canvas.sides { display: block; width: min(100%, 620px); height: auto; margin: 6p
 @media (prefers-reduced-motion: reduce) {
   #crt, #scan::after, #emblem .ring { animation: none !important; }
 }
+
+/* weather */
+.wx-panel { cursor: pointer; }
+.wx-now { display: flex; align-items: baseline; gap: 12px; }
+#wx-temp { font: 48px/1 var(--term); color: var(--hi); }
+#wx-cond { font: 20px/1.1 var(--term); letter-spacing: .06em; }
+.wx-arrow { display: inline-block; font-family: var(--ui); }
+.wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 8px; }
+.wx-hours div { border: 1px solid var(--dim); text-align: center; padding: 2px 0; display: flex; flex-direction: column; background: rgba(0,0,0,.3); }
+.wx-hours b { font-weight: 400; color: var(--mid); font-size: 10px; }
+.wx-hours span { font: 18px/1 var(--term); color: var(--hi); }
+.wx-hours i { font-style: normal; font-size: 9px; letter-spacing: .02em; }
+.wx-hours small { font-size: 9px; color: var(--mid); min-height: 1em; }
+.wx-foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9px; color: var(--dim); letter-spacing: .15em; }
