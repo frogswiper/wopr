@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/frogswiper/wopr/main/install.sh | b
 
 The installer:
 
-1. installs **Ollama** if it isn't present (official `ollama.com` installer)
+1. installs **Ollama** if it isn't present (official `ollama.com` installer; on a Mac that is the Ollama app)
 2. starts the Ollama server if it isn't running
 3. runs `ollama signin`. If a link is shown, open it, approve, and the install continues
 4. finds the **newest GLM cloud model** on ollama.com (currently `glm-5.3:cloud`) and pulls it
@@ -33,7 +33,8 @@ The installer:
    manager. macOS uses the built-in `say` instead
 6. uses the system Node.js 18+ if there is one; otherwise it downloads a checksum-verified Node 22
    into `~/.local/share/wopr/node` (no sudo)
-7. installs W.O.P.R. to `~/.local/share/wopr/app`, adds the `wopr` command and a menu entry, then launches it
+7. installs W.O.P.R. to `~/.local/share/wopr/app`, adds the `wopr` command and a menu entry (on a Mac: a
+   **W.O.P.R. app** in `~/Applications`), then launches it
 
 Options (set them before `bash`, e.g. `curl … | WOPR_MODEL=glm-5.2:cloud bash`):
 
@@ -45,6 +46,21 @@ Options (set them before `bash`, e.g. `curl … | WOPR_MODEL=glm-5.2:cloud bash`
 | `WOPR_NO_LAUNCH` | — | `1` = don't launch at the end |
 
 Settings are saved in `~/.config/wopr/wopr.env`. Run the one-liner again to update.
+
+### macOS
+
+The same one-liner works on macOS 12 or newer (Apple silicon and Intel). Paste it into **Terminal**.
+
+- Ollama is installed as the normal **Ollama app** in `/Applications` (it may ask for your password once to
+  add the `ollama` command). W.O.P.R. starts it if it isn't running.
+- W.O.P.R. gets its own app, **`~/Applications/WOPR.app`**. Open it from Launchpad or Spotlight, or drag it to the Dock.
+- It opens in a full-screen window of Firefox, Chrome, Chromium, Brave, Edge or Vivaldi, whichever is in
+  `/Applications`, using its own profile. Safari has no kiosk mode; `WOPR_BROWSER=default` opens a normal tab in your default browser (e.g. Safari).
+  When W.O.P.R. shuts down (Esc), that browser window quits too.
+- The first time, macOS may ask whether the browser may use your location. If you say no, W.O.P.R. uses your IP
+  address instead. Joshua speaks with the built-in `say` voices (Fred by default), so nothing extra is installed for the voice.
+- To use the `wopr` command in Terminal, add `~/.local/bin` to your PATH:
+  `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile` (then open a new Terminal window).
 
 ## Install on Windows 10 / 11
 

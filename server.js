@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 
 const PORT = parseInt(process.env.WOPR_PORT || '1983', 10);
 const BIND = process.env.WOPR_BIND || '127.0.0.1';
@@ -80,7 +80,18 @@ const SAY_VOICES = ['Fred', 'Ralph', 'Albert', 'Zarvox', 'Trinoids', 'Junior', '
 
 function listVoices() {
   if (!TTS) return [];
-  if (TTS.kind === 'say') return SAY_VOICES;
+  if (TTS.kind === 'say') {
+    // Newer macOS releases dropped some of the classic voices; offer only those that are installed.
+    try {
+      const out = execFileSync(TTS.bin, ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
+      const have = new Set(out.split('\n').map((l) => (l.match(/^(.+?)\s{2,}\S+\s+#/) || [])[1]).filter(Boolean));
+      const v = SAY_VOICES.filter((x) => have.has(x));
+      if (v.length) return v;
+      const en = out.split('\n').map((l) => l.match(/^(.+?)\s{2,}en[_-]/)).filter(Boolean).map((m) => m[1]);
+      if (en.length) return en.slice(0, 8);
+    } catch { /* fall through */ }
+    return SAY_VOICES;
+  }
   const dirs = [
     process.env.ESPEAK_DATA_PATH && path.join(process.env.ESPEAK_DATA_PATH, 'espeak-ng-data/voices/!v'),
     path.join(path.dirname(TTS.bin), 'espeak-ng-data/voices/!v'),

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Start the W.O.P.R. terminal server (if not already up) and open it full screen in its own window.
-DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SELF="$0"   # follow the ~/.local/bin symlink without GNU readlink -f (macOS)
+while [ -L "$SELF" ]; do l="$(readlink "$SELF")"; case "$l" in /*) SELF="$l" ;; *) SELF="$(dirname "$SELF")/$l" ;; esac; done
+DIR="$(cd "$(dirname "$SELF")" && pwd)"
+MAC=; [ "$(uname -s)" = Darwin ] && MAC=1
 
 # Optional config written by install.sh: WOPR_MODEL, WOPR_NODE, WOPR_PORT, WOPR_TTS, OLLAMA_URL ...
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/wopr/wopr.env"
@@ -26,6 +29,11 @@ if [ -f "$DIR/.version" ] && [ "$(basename "$DIR")" = app ] && [ -f "$DATA_DIR/s
   [ -d "$DIR" ] || mv "$DATA_DIR/app.old" "$DIR"
 fi
 
+# macOS: the Ollama menu-bar app runs the model server; start it if it is not running.
+if [ -n "$MAC" ] && ! curl -s -o /dev/null --max-time 2 "${OLLAMA_URL:-http://127.0.0.1:11434}/api/version"; then
+  open -g -a Ollama --args hidden >/dev/null 2>&1 || { command -v ollama >/dev/null && nohup ollama serve >/dev/null 2>&1 & }
+fi
+
 if ! curl -s -o /dev/null "${URL}wopr.json"; then
   nohup "$NODE" "$DIR/server.js" > "$LOG" 2>&1 &
   for _ in $(seq 25); do curl -s -o /dev/null "${URL}wopr.json" && break; sleep 0.2; done
@@ -37,22 +45,41 @@ fi
 #   WOPR_BROWSER=auto      Firefox, else Chrome / Chromium / Brave / Edge   (default)
 #   WOPR_BROWSER=chrome    a Chromium-family browser only
 #   WOPR_BROWSER=firefox   Firefox only
-#   WOPR_BROWSER=default   a normal tab in the desktop's default browser
+#   WOPR_BROWSER=default   a normal tab in the desktop's default browser (Safari on a Mac)
 open_default() {
-  if command -v xdg-open >/dev/null; then xdg-open "$URL" >/dev/null 2>&1 &
-  elif command -v open >/dev/null; then open "$URL"
+  if [ -n "$MAC" ]; then open "$URL"
+  elif command -v xdg-open >/dev/null; then xdg-open "$URL" >/dev/null 2>&1 &
   else echo "W.O.P.R. is running at $URL"; fi
 }
 
+mac_app() {   # mac_app "Google Chrome" -> path of the browser binary inside the .app bundle
+  local d
+  for d in /Applications "$HOME/Applications"; do
+    [ -x "$d/$1.app/Contents/MacOS/$1" ] && { echo "$d/$1.app/Contents/MacOS/$1"; return 0; }
+  done
+  return 1
+}
+
 is_snap() {   # Ubuntu ships /usr/bin/firefox and /usr/bin/chromium-browser as wrappers around snaps
+  [ -n "$MAC" ] && return 1
   local p; p="$(command -v "$1")" || return 1
   case "$p" in /snap/*) return 0 ;; esac                      # /snap/bin/<name> -> /usr/lib/snapd/snapd
   case "$(readlink -f "$p")" in /snap/*|*/snapd/snapd) return 0 ;; esac
   grep -qs "/snap/bin/" "$p"
 }
 
+# macOS keeps a browser running after its last window closes. Quit this profile's browser once
+# W.O.P.R. has shut down (Esc / logoff), so it does not linger in the Dock.
+mac_cleanup() {
+  [ -n "$MAC" ] || return 0
+  nohup bash -c 'sleep 15; while curl -s -o /dev/null --max-time 3 "$1"; do sleep 3; done; pkill -f -- "$2"' \
+    _ "${URL}wopr.json" "$PROFILE" >/dev/null 2>&1 &
+}
+
 open_firefox() {
-  command -v firefox >/dev/null || return 1
+  local ff
+  if [ -n "$MAC" ]; then ff="$(mac_app Firefox)" || return 1
+  else ff="$(command -v firefox)" || return 1; fi
   # Snap Firefox cannot read hidden directories, so its profile lives under ~/snap.
   if is_snap firefox; then PROFILE="$HOME/snap/firefox/common/wopr-profile"
   else PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/firefox-profile"; fi
@@ -75,27 +102,33 @@ user_pref("signon.rememberSignons", false);
 user_pref("dom.allow_scripts_to_close_windows", true);
 user_pref("permissions.default.geo", 1);
 PREFS
-  nohup firefox --profile "$PROFILE" --kiosk --new-window "$URL" >/dev/null 2>&1 &
+  nohup "$ff" --profile "$PROFILE" --kiosk --new-window "$URL" >/dev/null 2>&1 &
+  mac_cleanup
 }
 
 open_chromium() {
-  local b s
-  for b in google-chrome google-chrome-stable chromium chromium-browser brave-browser microsoft-edge microsoft-edge-stable vivaldi; do
-    command -v "$b" >/dev/null || continue
+  local b s exe prefs
+  if [ -n "$MAC" ]; then set -- "Google Chrome" "Chromium" "Brave Browser" "Microsoft Edge" "Vivaldi"
+  else set -- google-chrome google-chrome-stable chromium chromium-browser brave-browser microsoft-edge microsoft-edge-stable vivaldi; fi
+  for b in "$@"; do
+    if [ -n "$MAC" ]; then exe="$(mac_app "$b")" || continue
+    else exe="$(command -v "$b")" || continue; fi
     if is_snap "$b"; then   # snaps may only write under ~/snap/<snap name>
       case "$b" in chromium*) s=chromium ;; brave*) s=brave ;; *) s="$b" ;; esac
       PROFILE="$HOME/snap/$s/common/wopr-profile"
     else PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/chromium-profile"; fi
+    prefs="$PROFILE/Default/Preferences"
     mkdir -p "$PROFILE/Default"
     # First run: pre-allow location for this page and skip the welcome / restore bubbles.
-    if [ ! -s "$PROFILE/Default/Preferences" ]; then
-      printf '{"profile":{"exit_type":"Normal","exited_cleanly":true,"content_settings":{"exceptions":{"geolocation":{"http://127.0.0.1:%s,*":{"setting":1}}}}},"browser":{"check_default_browser":false,"has_seen_welcome_page":true},"translate":{"enabled":false}}\n' "$PORT" > "$PROFILE/Default/Preferences"
-    else
-      sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' "$PROFILE/Default/Preferences"
+    if [ ! -s "$prefs" ]; then
+      printf '{"profile":{"exit_type":"Normal","exited_cleanly":true,"content_settings":{"exceptions":{"geolocation":{"http://127.0.0.1:%s,*":{"setting":1}}}}},"browser":{"check_default_browser":false,"has_seen_welcome_page":true},"translate":{"enabled":false}}\n' "$PORT" > "$prefs"
+    else   # (no sed -i: it differs between GNU and macOS)
+      sed 's/"exit_type":"Crashed"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' "$prefs" > "$prefs.tmp" && mv "$prefs.tmp" "$prefs"
     fi
-    nohup "$b" --user-data-dir="$PROFILE" --kiosk --app="$URL" --autoplay-policy=no-user-gesture-required \
+    nohup "$exe" --user-data-dir="$PROFILE" --kiosk --app="$URL" --autoplay-policy=no-user-gesture-required \
       --no-first-run --no-default-browser-check --password-store=basic --disable-features=Translate \
       --disable-session-crashed-bubble >/dev/null 2>&1 &
+    mac_cleanup
     return 0
   done
   return 1
