@@ -72,8 +72,8 @@ starts after your first key press.
 
 ## What's inside
 
-- **Boot**: the NORAD big board, then an LED-bitmap world that zooms in on your location (default
-  Hønefoss, Norway) until the target locks. Then the system log and a dial-up to the inference node. Then
+- **Boot**: the NORAD big board, then an LED-bitmap world that zooms in on this computer's location
+  until the target locks (Hønefoss, Norway if it cannot be found). Then the system log and a dial-up to the inference node. Then
   `LOGON: JOSHUA`, and *"SHALL WE PLAY A GAME?"*, typed and spoken.
 - **Terminal**: David's blue IMSAI screen. Every reply streams in upper case and is read aloud a
   sentence at a time.
@@ -87,6 +87,7 @@ starts after your first key press.
 - **Weather**: a small panel under the big board with temperature, conditions, wind and the next six
   hours from [Open-Meteo](https://open-meteo.com) (no key). Click it and Joshua reads it out; ask him about
   the weather and he knows. `/weather <place>` changes the location, which is also the intro zoom target.
+- **Where it thinks you are**: at every start it locates the computer. It uses the browser's location only when that is precise (under 5 km, e.g. Windows location services or Wi-Fi); otherwise it uses your IP address via BigDataCloud's free client API. Place names come from Open-Meteo's geocoder, so local spellings like Hønefoss survive. `/weather <place>` pins a place, and `/locate` goes back to automatic. Coordinates are sent only to BigDataCloud and Open-Meteo and are stored in the browser.
 - **W.O.P.R. core**: the cabinet's indicator lamps. They blink harder while it thinks and talks.
 - **DEFCON** readiness display, plus panels for model, voice, prime directive, parameters and
   telemetry, and game logs saved in the browser.
@@ -120,6 +121,7 @@ Env vars: `WOPR_PORT` (1983), `WOPR_BIND` (127.0.0.1), `OLLAMA_URL` (http://127.
 - `public/worldmap.js` is generated from Natural Earth 1:110m data (public domain) by
   `tools/build-map.py`. `public/detailmap.js` is a 1:10m inset of southern Norway for the intro
   zoom, built by `tools/build-detail.py`; other locations zoom on the 1:110m map.
+- `public/where.js` (location, weather panel, boot zoom) is shared with SKYNET; keep the copies identical.
 - The weather panel and `/weather` call `api.open-meteo.com` and `geocoding-api.open-meteo.com` from the browser.
 - Fonts: VT323 and Share Tech Mono, both SIL Open Font License (see `public/fonts/`).
 

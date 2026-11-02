@@ -623,222 +623,6 @@ function sceneDraw(sc, now) {
   if (sc.white > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, sc.white)})`; ctx.fillRect(0, 0, sc.w, sc.h); sc.white -= 0.04; }
 }
 
-/* ---------------- intro: LED bitmap world, zooming in on the operator's location ---------------- */
-const DEFAULT_PLACE = { name: 'HØNEFOSS', country: 'NORWAY', lat: 60.1683, lon: 10.2565 };
-const place = () => S.settings.place || DEFAULT_PLACE;
-function dms(v, pos, neg, w) {
-  const a = Math.abs(v), d = Math.floor(a), m = Math.round((a - d) * 60);
-  return `${String(m === 60 ? d + 1 : d).padStart(w, '0')}°${pad(m === 60 ? 0 : m)}'${v >= 0 ? pos : neg}`;
-}
-const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-
-async function zoomIntro() {
-  const el = $('#zoomer'), cv = $('#zoom-map');
-  const W0 = window.WORLD, DT = window.DETAIL;
-  if (!W0) return;
-  el.hidden = false;
-  const P = place();
-  const W = innerWidth, H = innerHeight;
-  const cell = Math.max(5, Math.round(W / 230));
-  const gw = Math.ceil(W / cell), gh = Math.ceil(H / cell);
-  cv.width = gw * cell; cv.height = gh * cell;
-  const ctx = cv.getContext('2d');
-  const off = document.createElement('canvas'); off.width = gw; off.height = gh;
-  const o = off.getContext('2d');
-  // LED mask: a dark gap on the right and bottom edge of every cell.
-  const pc = document.createElement('canvas'); pc.width = pc.height = cell;
-  const pctx = pc.getContext('2d'), gap = Math.max(1, Math.round(cell / 4));
-  pctx.fillStyle = 'rgba(0,0,0,.92)'; pctx.fillRect(cell - gap, 0, gap, cell); pctx.fillRect(0, cell - gap, cell, gap);
-  const mask = ctx.createPattern(pc, 'repeat');
-
-  const inDetail = DT && P.lon > DT.box[0] + 0.5 && P.lon < DT.box[2] - 0.5 && P.lat > DT.box[1] + 0.3 && P.lat < DT.box[3] - 0.3;
-  const wStart = Math.min(360, 180 * gw / gh), wEnd = inDetail ? 2.4 : 14;
-  const quick = S.settings.quickBoot;
-  const dur = quick ? 2200 : 6000, hold = quick ? 900 : 2300;
-  const top = $('#zm-top'), tag = $('#zm-tag'), bottom = $('#zm-bottom');
-  bottom.textContent = '';
-
-  const LAND = '#3fb4ff', WATER = '#04112c';
-  const fillRings = (arrs, q, k, cx, cy, cosf, clon, clat) => {
-    o.beginPath();
-    for (const a of arrs) {
-      let minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
-      const pts = [];
-      for (let i = 0; i < a.length; i += 2) {
-        const x = (a[i] / q - clon) * cosf * k + cx, y = (clat - a[i + 1] / q) * k + cy;
-        pts.push(x, y);
-        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
-      }
-      if (maxx < 0 || minx > gw || maxy < 0 || miny > gh || (maxx - minx < 0.3 && maxy - miny < 0.3)) continue;
-      o.moveTo(pts[0], pts[1]);
-      for (let i = 2; i < pts.length; i += 2) o.lineTo(pts[i], pts[i + 1]);
-      o.closePath();
-    }
-    o.fill('evenodd');
-  };
-  const frame = (t) => {
-    const e = ease(t);
-    const w = Math.exp(Math.log(wStart) + (Math.log(wEnd) - Math.log(wStart)) * e);
-    const c = ease(Math.min(1, t * 1.6));
-    const clon = 0 + (P.lon - 0) * c, clat = 12 + (P.lat - 12) * c;
-    const cosf = Math.cos(clat * Math.PI / 180 * Math.min(1, e * 2));
-    const k = gw / (w * cosf);
-    const cx = gw / 2, cy = gh / 2;
-    o.fillStyle = WATER; o.fillRect(0, 0, gw, gh);
-    o.fillStyle = LAND; fillRings(W0.land, W0.q, k, cx, cy, cosf, clon, clat);
-    o.fillStyle = WATER; fillRings(W0.lakes, W0.q, k, cx, cy, cosf, clon, clat);
-    if (DT && w < 45) {
-      const [x0, y0, x1, y1] = DT.box;
-      const bx0 = (x0 - clon) * cosf * k + cx, bx1 = (x1 - clon) * cosf * k + cx, by0 = (clat - y1) * k + cy, by1 = (clat - y0) * k + cy;
-      if (bx1 > 0 && bx0 < gw && by1 > 0 && by0 < gh) {
-        o.save(); o.beginPath(); o.rect(bx0, by0, bx1 - bx0, by1 - by0); o.clip();
-        o.fillStyle = WATER; o.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
-        o.fillStyle = LAND; fillRings(DT.land, DT.q, k, cx, cy, cosf, clon, clat);
-        o.fillStyle = WATER; fillRings(DT.lakes, DT.q, k, cx, cy, cosf, clon, clat);
-        if (w < 16) {
-          o.strokeStyle = '#0a3f9a'; o.lineWidth = Math.min(1.2, 9 / w); o.beginPath();
-          for (const a of DT.rivers) {
-            for (let i = 0; i < a.length; i += 2) {
-              const x = (a[i] / DT.q - clon) * cosf * k + cx, y = (clat - a[i + 1] / DT.q) * k + cy;
-              if (i) o.lineTo(x, y); else o.moveTo(x, y);
-            }
-          }
-          o.stroke();
-        }
-        o.restore();
-      }
-    }
-    // upscale: crisp cells, the LED gaps, then a faint bloom on top
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(off, 0, 0, gw * cell, gh * cell);
-    ctx.fillStyle = mask; ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.imageSmoothingEnabled = true; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.22;
-    ctx.drawImage(off, 0, 0, gw * cell, gh * cell);
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    // target
-    const tx = ((P.lon - clon) * cosf * k + cx) * cell, ty = ((clat - P.lat) * k + cy) * cell;
-    ctx.strokeStyle = 'rgba(255,90,42,.55)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(cv.width, ty); ctx.moveTo(tx, 0); ctx.lineTo(tx, cv.height); ctx.stroke();
-    const r = cell * (3 + 4 * (1 - e)), blink = t >= 1 && Math.floor(performance.now() / 180) % 2;
-    ctx.strokeStyle = blink ? '#fff' : '#ff5a2a'; ctx.lineWidth = 3; ctx.shadowColor = '#ff5a2a'; ctx.shadowBlur = 12;
-    ctx.strokeRect(tx - r, ty - r, r * 2, r * 2); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#ff5a2a'; ctx.fillRect(Math.floor(tx / cell) * cell, Math.floor(ty / cell) * cell, cell - gap, cell - gap);
-    tag.style.transform = `translate(${Math.round(tx + r + 12)}px, ${Math.round(ty - r)}px)`;
-    tag.textContent = t >= 1 ? `${P.name}\n${P.country}` : `TRK ${pad(Math.round(t * 999), 3)}`;
-    top.textContent = `W.O.P.R. GLOBAL POSITIONING // TARGET ACQUISITION\n` +
-      `CENTER ${dms(clat, 'N', 'S', 2)} ${dms(clon, 'E', 'W', 3)}    FIELD ${w.toFixed(w < 10 ? 2 : 1).padStart(6)} DEG    MAG x${Math.round(wStart / w)}`;
-  };
-
-  let skip = false;
-  const onKey = () => { skip = true; };
-  addEventListener('keydown', onKey); addEventListener('pointerdown', onKey);
-  sweep(80, 600, dur / 1000, 0.012, 'triangle');
-  const t0 = performance.now();
-  let lastTick = 0;
-  await new Promise((resolve) => {
-    const step = (now) => {
-      const t = skip ? 1 : Math.min(1, (now - t0) / dur);
-      frame(t);
-      if (now - lastTick > 140 && t < 1) { lastTick = now; beep(300 + t * 1500, 0.015, 'square', 0.006); }
-      if (t < 1) requestAnimationFrame(step); else resolve();
-    };
-    requestAnimationFrame(step);
-  });
-  beep(1320, 0.08, 'square', 0.025); beep(1760, 0.12, 'square', 0.025, 0.12);
-  bottom.textContent = `TARGET ACQUIRED: ${P.name}, ${P.country}\n${dms(P.lat, 'N', 'S', 2)}  ${dms(P.lon, 'E', 'W', 3)}`;
-  const tEnd = performance.now() + (skip ? 500 : hold);
-  await new Promise((resolve) => {
-    const step = (now) => { frame(1); if (now < tEnd) requestAnimationFrame(step); else resolve(); };
-    requestAnimationFrame(step);
-  });
-  removeEventListener('keydown', onKey); removeEventListener('pointerdown', onKey);
-  el.classList.add('off');
-  await sleepRaw(450);
-  el.hidden = true;
-}
-
-/* ---------------- weather (Open-Meteo, no key) ---------------- */
-const WMO = {
-  0: ['CLEAR', 'CLR'], 1: ['MAINLY CLEAR', 'CLR'], 2: ['PARTLY CLOUDY', 'PCLD'], 3: ['OVERCAST', 'OVC'], 45: ['FOG', 'FOG'], 48: ['FREEZING FOG', 'FOG'],
-  51: ['LIGHT DRIZZLE', 'DRZ'], 53: ['DRIZZLE', 'DRZ'], 55: ['HEAVY DRIZZLE', 'DRZ'], 56: ['FREEZING DRIZZLE', 'FZDZ'], 57: ['FREEZING DRIZZLE', 'FZDZ'],
-  61: ['LIGHT RAIN', 'RAIN'], 63: ['RAIN', 'RAIN'], 65: ['HEAVY RAIN', 'RAIN+'], 66: ['FREEZING RAIN', 'FZRA'], 67: ['FREEZING RAIN', 'FZRA'],
-  71: ['LIGHT SNOW', 'SNOW'], 73: ['SNOW', 'SNOW'], 75: ['HEAVY SNOW', 'SNOW+'], 77: ['SNOW GRAINS', 'SNOW'],
-  80: ['RAIN SHOWERS', 'SHWR'], 81: ['RAIN SHOWERS', 'SHWR'], 82: ['VIOLENT SHOWERS', 'SHWR+'], 85: ['SNOW SHOWERS', 'SNSH'], 86: ['SNOW SHOWERS', 'SNSH'],
-  95: ['THUNDERSTORM', 'TSTM'], 96: ['THUNDERSTORM, HAIL', 'TSTM'], 99: ['THUNDERSTORM, HAIL', 'TSTM'],
-};
-const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-const COMPASS_WORDS = ['NORTH', 'NORTHEAST', 'EAST', 'SOUTHEAST', 'SOUTH', 'SOUTHWEST', 'WEST', 'NORTHWEST'];
-let WX = null;
-async function loadWeather() {
-  const P = place();
-  $('#wx-place').textContent = P.name;
-  try {
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${P.lat}&longitude=${P.lon}` +
-      '&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m' +
-      '&hourly=temperature_2m,precipitation_probability,weather_code&forecast_hours=7&wind_speed_unit=ms&timezone=auto';
-    WX = await getJSON(u, 10000);
-    WX.at = Date.now();
-  } catch (e) {
-    if (!WX) { $('#wx-cond').textContent = 'NO CARRIER'; $('#wx-kv').innerHTML = `<dt>LINK</dt><dd>${esc(e.message.toUpperCase().slice(0, 30))}</dd>`; }
-    return;
-  }
-  renderWeather();
-}
-function renderWeather() {
-  if (!WX || !WX.current) return;
-  const c = WX.current, cond = WMO[c.weather_code] || ['UNKNOWN', '?'];
-  const dir = Math.round(((c.wind_direction_10m || 0) % 360) / 45) % 8;
-  $('#wx-temp').textContent = `${Math.round(c.temperature_2m)}°`;
-  $('#wx-cond').textContent = cond[0];
-  const arrow = `<span class="wx-arrow" style="transform:rotate(${(c.wind_direction_10m || 0) + 180}deg)">↑</span>`;
-  $('#wx-kv').innerHTML =
-    `<dt>WIND</dt><dd>${arrow} ${COMPASS[dir]} ${c.wind_speed_10m.toFixed(1)} M/S${c.wind_gusts_10m ? ' (' + Math.round(c.wind_gusts_10m) + ')' : ''}</dd>` +
-    `<dt>FEELS</dt><dd>${Math.round(c.apparent_temperature)}°</dd>` +
-    `<dt>HUMIDITY</dt><dd>${c.relative_humidity_2m}%</dd>` +
-    `<dt>PRECIP</dt><dd>${(c.precipitation || 0).toFixed(1)} MM</dd>`;
-  const h = WX.hourly || {};
-  const cols = [];
-  for (let i = 1; i < Math.min(7, (h.time || []).length); i++) {
-    const hh = h.time[i].slice(11, 13);
-    const ab = (WMO[h.weather_code[i]] || ['', '?'])[1];
-    const pp = h.precipitation_probability ? h.precipitation_probability[i] : null;
-    cols.push(`<div><b>${hh}</b><span>${Math.round(h.temperature_2m[i])}°</span><i>${ab}</i><small>${pp == null ? '' : pp + '%'}</small></div>`);
-  }
-  $('#wx-hours').innerHTML = cols.join('');
-  $('#wx-time').textContent = 'OBS ' + (c.time || '').slice(11, 16);
-}
-function weatherReport() {
-  if (!WX || !WX.current) return null;
-  const c = WX.current, cond = (WMO[c.weather_code] || ['UNKNOWN'])[0];
-  const dir = COMPASS_WORDS[Math.round(((c.wind_direction_10m || 0) % 360) / 45) % 8];
-  return `${place().name}. ${Math.round(c.temperature_2m)} DEGREES. ${cond}. WIND ${Math.round(c.wind_speed_10m)} METERS PER SECOND FROM THE ${dir}.`;
-}
-// One line for the model, so Joshua can answer weather questions.
-function weatherContext() {
-  if (!WX || !WX.current || Date.now() - WX.at > 3 * 3600e3) return '';
-  const c = WX.current, cond = (WMO[c.weather_code] || ['UNKNOWN'])[0];
-  const h = WX.hourly || {};
-  const next = (h.time || []).slice(1, 7).map((t, i) => `${t.slice(11, 16)} ${Math.round(h.temperature_2m[i + 1])}C ${(WMO[h.weather_code[i + 1]] || ['?'])[0]}`).join('; ');
-  return `\n\nWeather feed for ${place().name}, ${place().country} (observed ${(c.time || '').replace('T', ' ')} local): ` +
-    `${Math.round(c.temperature_2m)}C, feels ${Math.round(c.apparent_temperature)}C, ${cond}, wind ${c.wind_speed_10m.toFixed(1)} m/s ` +
-    `from ${Math.round(c.wind_direction_10m)} deg, humidity ${c.relative_humidity_2m}%. Next hours: ${next}. ` +
-    'Use this only when the operator asks about the weather.';
-}
-async function setPlace(q) {
-  const el = note('LOCATING ' + q.toUpperCase() + ' ...', { small: true });
-  try {
-    const r = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`, 10000);
-    const g = r.results && r.results[0];
-    if (!g) { el.textContent = 'LOCATION NOT FOUND: ' + q.toUpperCase(); return; }
-    S.settings.place = { name: g.name.toUpperCase(), country: (g.country || '').toUpperCase(), lat: g.latitude, lon: g.longitude };
-    save();
-    el.textContent = `LOCATION SET: ${S.settings.place.name}, ${S.settings.place.country}  ${g.latitude.toFixed(3)} ${g.longitude.toFixed(3)}`;
-    WX = null; await loadWeather();
-    const rep = weatherReport(); if (rep) speak(rep);
-  } catch (e) { el.textContent = 'GEOCODER NO CARRIER: ' + e.message; }
-}
-
 /* ---------------- boot sequence ---------------- */
 let skipping = false;
 const sleep = (ms) => (skipping ? Promise.resolve() : sleepRaw(ms));
@@ -898,7 +682,11 @@ async function boot() {
   const verP = getJSON('/api/version', 4000).catch(() => null);
   const tagsP = getJSON('/api/tags', 6000).catch(() => null);
   await splash();
-  await zoomIntro();
+  await WHERE.zoom({
+    root: $('#zoomer'), canvas: $('#zoom-map'), top: $('#zm-top'), tag: $('#zm-tag'), bottom: $('#zm-bottom'),
+    place: await WHERE.ready(1500), quick: S.settings.quickBoot,
+    title: 'W.O.P.R. GLOBAL POSITIONING // TARGET ACQUISITION', acquired: 'TARGET ACQUIRED',
+  });
   audio();
   const skip = () => { skipping = true; };
   addEventListener('keydown', skip); addEventListener('pointerdown', skip);
@@ -994,7 +782,7 @@ async function startMain() {
   startLamps();
   startScope();
   startBoard();
-  loadWeather(); setInterval(loadWeather, 15 * 60e3);
+  WHERE.loadWeather(); setInterval(WHERE.loadWeather, 15 * 60e3);
   updateTelemetry(null);
   setDefcon(5);
   $('#input').focus();
@@ -1386,7 +1174,7 @@ function scheduleRender() {
 /* ---------- chat ---------- */
 function buildMessages(s) {
   const out = [];
-  const sys = ((S.settings.system || '').replaceAll('{OPERATOR}', opName()) + weatherContext()).trim();
+  const sys = ((S.settings.system || '').replaceAll('{OPERATOR}', opName()) + WHERE.context()).trim();
   if (sys) out.push({ role: 'system', content: sys });
   for (const m of s.messages) {
     if (m.role === 'user') out.push({ role: 'user', content: m.content });
@@ -2066,7 +1854,8 @@ const HELP =
   /think on|off         STRATEGIC ANALYSIS (THINKING MODELS)
   /voice on|off|test    VOICE SYNTHESIZER
   /say <text>           MAKE JOSHUA SAY SOMETHING
-  /weather [place]      WEATHER REPORT / SET LOCATION (ALSO THE INTRO TARGET)
+  /weather [place]      WEATHER REPORT / PIN A LOCATION (ALSO THE INTRO TARGET)
+  /locate               FIND THIS COMPUTER AGAIN (UNDOES A PINNED PLACE)
   /defcon <1-5>         SET THE READINESS CONDITION DISPLAY
   /export               DOWNLOAD THIS LOG AS TEXT
   /theme blue|green|amber   /sound on|off   /boot full|quick
@@ -2132,10 +1921,17 @@ async function command(line) {
       S.settings.voice.on = arg !== 'off'; if (!S.settings.voice.on) stopVoice();
       save(); applyTheme(); fillVoiceList(); note('VOICE SYNTHESIZER ' + (S.settings.voice.on ? 'ON' : 'OFF'), { small: true }); break;
     case 'say': if (arg) speak(arg); break;
-    case 'weather':
-      if (arg) setPlace(arg);
-      else { const r = weatherReport(); if (r) wline(r); else note('WEATHER FEED OFFLINE.', { small: true }); }
+    case 'locate': case 'weather': {
+      const auto = cmd.toLowerCase() === 'locate' || /^(auto|here)$/i.test(arg);
+      if (!arg && !auto) { const r = WHERE.report(); if (r) wline(r); else note('WEATHER FEED OFFLINE.', { small: true }); break; }
+      const el = note((auto ? 'LOCATING THIS TERMINAL' : 'LOCATING ' + arg.toUpperCase()) + ' ...', { small: true });
+      const p = auto ? await WHERE.locate(true) : await WHERE.search(arg).catch(() => null);
+      if (!p) { el.textContent = 'LOCATION NOT FOUND: ' + arg.toUpperCase(); break; }
+      el.textContent = `LOCATION: ${p.name}, ${p.country}  ${p.lat.toFixed(3)} ${p.lon.toFixed(3)}  (${WHERE.srcLabel(p)})`;
+      await WHERE.loadWeather();
+      const r = WHERE.report(); if (r) speak(r);
       break;
+    }
     case 'defcon': { const n = parseInt(arg, 10); if (n >= 1 && n <= 5) setDefcon(n); else note('DEFCON 1-5.', { small: true }); break; }
     case 'export': exportSession(); break;
     case 'theme':
@@ -2333,7 +2129,7 @@ function bindUI() {
   $('#btn-left').onclick = () => $('#left').classList.toggle('open');
   $('#btn-right').onclick = () => $('#right').classList.toggle('open');
   $('#board').onclick = () => { if (!TH.on && !busy) runBigBoard(); };
-  $('#wx-panel').onclick = () => { const r = weatherReport(); if (r) { stopVoice(); speak(r); } else loadWeather(); };
+  $('#wx-panel').onclick = () => { const r = WHERE.report(); if (r) { stopVoice(); speak(r); } else WHERE.loadWeather(); };
 }
 
 // Click the big board: watch it full screen until ESC (no game, no ending).
@@ -2355,4 +2151,11 @@ async function runBigBoard() {
 
 /* ---------- go ---------- */
 document.body.className = 'theme-' + S.settings.theme;
+WHERE.setup({
+  get: () => S.settings.place || null,
+  set: (p) => { S.settings.place = p; save(); },
+  onChange: () => { if (!$('#main').hidden) WHERE.loadWeather(); },
+  beep, sweep,
+});
+WHERE.locate();          // runs during the splash, so the zoom can target this computer
 boot();

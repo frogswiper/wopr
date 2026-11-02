@@ -54,6 +54,7 @@ user_pref("browser.tabs.warnOnClose", false);
 user_pref("browser.translations.automaticallyPopup", false);
 user_pref("signon.rememberSignons", false);
 user_pref("dom.allow_scripts_to_close_windows", true);
+user_pref("permissions.default.geo", 1);
 PREFS
   nohup firefox --profile "$PROFILE" --kiosk --new-window "$URL" >/dev/null 2>&1 &
 else
