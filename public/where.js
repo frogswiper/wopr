@@ -59,7 +59,7 @@
     } catch { return p.name; }
   }
   async function autoLocate() {
-    const [fix, ip] = await Promise.all([browserFix(8000), bdc().catch(() => null)]);
+    const [fix, ip] = await Promise.all([browserFix(5000), bdc().catch(() => null)]);
     let p = null;
     if (fix && fix.acc <= PRECISE_M) {
       const r = await bdc(fix.lat, fix.lon).catch(() => ({ name: '', country: '' }));

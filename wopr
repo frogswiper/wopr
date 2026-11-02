@@ -32,7 +32,9 @@ open_default() {
 
 is_snap() {   # Ubuntu ships /usr/bin/firefox and /usr/bin/chromium-browser as wrappers around snaps
   local p; p="$(command -v "$1")" || return 1
-  readlink -f "$p" | grep -q '^/snap/' || grep -qs "/snap/bin/" "$p"
+  case "$p" in /snap/*) return 0 ;; esac                      # /snap/bin/<name> -> /usr/lib/snapd/snapd
+  case "$(readlink -f "$p")" in /snap/*|*/snapd/snapd) return 0 ;; esac
+  grep -qs "/snap/bin/" "$p"
 }
 
 open_firefox() {
