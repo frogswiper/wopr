@@ -3,3 +3,7 @@
 *.cmd -text
 *.ico binary
 *.woff2 binary
+
+# Screenshots are for GitHub only; installs and updates skip them
+docs export-ignore
+*.jpg binary

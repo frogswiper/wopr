@@ -5,6 +5,17 @@ logs on as **JOSHUA**, and **speaks** with a flat, word-by-word synthesizer voic
 says is *"SHALL WE PLAY A GAME?"*. Behind the 1983 front end, any local or Ollama cloud model does
 the talking. By default that is the newest **GLM cloud model**.
 
+
+![W.O.P.R. terminal](docs/screenshots/wopr-3-terminal.jpg)
+
+## Screenshots
+
+| | |
+|---|---|
+| <img src="docs/screenshots/wopr-1-bigboard.jpg" width="420" alt="Boot: the NORAD big board"><br><sub>Boot: the NORAD big board</sub> | <img src="docs/screenshots/wopr-2-target.jpg" width="420" alt="Zooming in on this computer: TARGET ACQUIRED"><br><sub>Zooming in on this computer: TARGET ACQUIRED</sub> |
+| <img src="docs/screenshots/wopr-4-games.jpg" width="420" alt="LIST GAMES and tic-tac-toe"><br><sub>LIST GAMES and tic-tac-toe</sub> | <img src="docs/screenshots/wopr-5-war.jpg" width="420" alt="Global Thermonuclear War on the big board"><br><sub>Global Thermonuclear War on the big board</sub> |
+| <img src="docs/screenshots/wopr-6-strange-game.jpg" width="420" alt="A strange game"><br><sub>A strange game</sub> | <img src="docs/screenshots/wopr-3-terminal.jpg" width="420" alt="The terminal, big board, DEFCON and weather"><br><sub>The terminal, big board, DEFCON and weather</sub> |
+
 ## Install on Linux / macOS (one line)
 
 ```bash
