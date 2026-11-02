@@ -155,12 +155,16 @@ Type `LIST GAMES`, or click LIST GAMES.
 
 - **GLOBAL THERMONUCLEAR WAR**: pick a side and list targets. The war then plays out full screen on
   the big board, followed by a montage of scenarios, every one ending in *WINNER: NONE*.
+- **FULL THERMAL NUCLEAR WAR**: no game at all. Joshua writes and says *The only way to win is by not to play!*
 - **TIC-TAC-TOE**: one player against a perfect opponent. With `NUMBER OF PLAYERS: 0` (or
   `/learn`), W.O.P.R. plays itself until it learns something.
 - **Everything else** (chess, poker, Falken's Maze, …) is played by the model in plain text.
 
 Type `/help` in the terminal for every command (`/play`, `/voice`, `/say`, `/name`, `/defcon`, …).
 Change what Joshua calls you with `/name` or the OPERATOR field; the default is PROFESSOR FALKEN.
+
+Typing is in capitals by default, like the real terminal. The **CASE** button in the top bar (or `/case mixed`,
+`/case upper`) switches to upper and lower case, so what you type is shown exactly as typed.
 
 ## Manual / development
 

@@ -385,3 +385,6 @@ canvas.sides { display: block; width: min(100%, 620px); height: auto; margin: 6p
 
 #foot-ver { color: var(--mid); }
 #foot-ver .upd { color: var(--bg); background: var(--fg); padding: 0 4px; text-shadow: none; font-weight: 400; }
+
+/* CASE: Aa — type and show the operator's own text in upper and lower case */
+.mixed-case #input, .mixed-case .msg.user .body { text-transform: none; }

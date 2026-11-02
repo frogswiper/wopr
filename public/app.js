@@ -53,6 +53,7 @@ const GAMES = [
   "FALKEN'S MAZE", 'BLACK JACK', 'GIN RUMMY', 'HEARTS', 'BRIDGE', 'CHECKERS', 'CHESS', 'POKER',
   'FIGHTER COMBAT', 'GUERRILLA ENGAGEMENT', 'DESERT WARFARE', 'AIR-TO-GROUND ACTIONS',
   'THEATERWIDE TACTICAL WARFARE', 'THEATERWIDE BIOTOXIC AND CHEMICAL WARFARE', '', 'GLOBAL THERMONUCLEAR WAR',
+  'FULL THERMAL NUCLEAR WAR',
 ];
 
 /* ---------------- state ---------------- */
@@ -77,7 +78,7 @@ function loadState() {
   s.sims = s.sims || 0;
   s.settings = Object.assign({
     model: '', system: DEFAULT_SYSTEM, operator: DEFAULT_OPERATOR, think: true, keepAlive: '5m',
-    theme: 'blue', sound: true, quickBoot: false,
+    theme: 'blue', sound: true, quickBoot: false, mixedCase: false,
   }, s.settings || {});
   s.settings.options = Object.assign({}, DEFAULT_OPTS, s.settings.options || {});
   s.settings.voice = Object.assign({}, DEFAULT_VOICE, s.settings.voice || {});
@@ -821,7 +822,9 @@ async function opening() {
 }
 
 function applyTheme() {
-  document.body.className = 'theme-' + S.settings.theme;
+  document.body.className = 'theme-' + S.settings.theme + (S.settings.mixedCase ? ' mixed-case' : '');
+  $('#btn-case').textContent = S.settings.mixedCase ? 'CASE: MIXED' : 'CASE: UPPER';
+  $('#btn-case').classList.toggle('on', !!S.settings.mixedCase);
   $('#btn-sound').textContent = S.settings.sound ? 'AUDIO: ON' : 'AUDIO: OFF';
   $('#btn-theme').textContent = 'PHOSPHOR: ' + S.settings.theme.toUpperCase();
   $('#btn-voice').textContent = S.settings.voice.on ? 'VOICE: ON' : 'VOICE: OFF';
@@ -1819,14 +1822,23 @@ function playGame(name, echo) {
   const num = parseInt(n, 10);
   const g = num > 0 ? GAMES.filter(Boolean)[num - 1] : n;
   if (!g) return wline('GAME NOT ON FILE.');
-  if (echo && /THERMONUCLEAR|TIC.?TAC.?TOE|NOUGHTS|^LEARN/.test(g)) wline(g, { who: 'user' });
+  if (echo && /THERMONUCLEAR|THERMAL NUCLEAR|TIC.?TAC.?TOE|NOUGHTS|^LEARN/.test(g)) wline(g, { who: 'user' });
+  if (/THERMAL NUCLEAR/.test(g)) return notToPlay();
   if (/THERMONUCLEAR/.test(g)) return gtwStart();
   if (/TIC.?TAC.?TOE|NOUGHTS/.test(g)) return tttStart();
   if (/^LEARN/.test(g)) return runTheater(learning);
   return send(`LET'S PLAY ${g}.`);
 }
+// FULL THERMAL NUCLEAR WAR: the lesson Joshua already learned. No game, just the answer.
+function notToPlay() {
+  if (busy) return note('BUSY. ESC TO ABORT FIRST.', { small: true });
+  stopVoice();
+  beep(440, 0.12, 'square', 0.04); beep(330, 0.25, 'square', 0.04, 0.14);
+  wline('The only way to win is by not to play!');
+}
 const TRIGGERS = [
   [/^(list|show|help)\s+games$/i, () => listGames()],
+  [/^(?:let'?s\s+|lets\s+|i\s+want\s+to\s+)?(?:play\s+)?full\s+thermal\s*nuclear\s+war[.!?]*$/i, () => notToPlay()],
   [/^(?:let'?s\s+|lets\s+|i\s+want\s+to\s+)?(?:play\s+)?global\s+thermonuclear\s+war$/i, () => gtwStart()],
   [/^(?:let'?s\s+|lets\s+)?(?:play\s+)?tic[\s-]?tac[\s-]?toe$/i, () => tttStart()],
   [/^(?:number of players:?\s*(?:0|zero)|play yourself|learn)$/i, () => runTheater(learning)],
@@ -1864,6 +1876,7 @@ const HELP =
   /defcon <1-5>         SET THE READINESS CONDITION DISPLAY
   /export               DOWNLOAD THIS LOG AS TEXT
   /theme blue|green|amber   /sound on|off   /boot full|quick
+  /case upper|mixed     TYPE IN CAPITALS ONLY, OR UPPER AND LOWER CASE
   /reboot               RESTART TERMINAL
   /logoff               SHUT DOWN W.O.P.R. (SAME AS ESC)
 
@@ -1943,6 +1956,12 @@ async function command(line) {
       if (THEMES.includes(arg)) { S.settings.theme = arg; save(); applyTheme(); } else note('THEMES: ' + THEMES.join(' / ').toUpperCase(), { small: true });
       break;
     case 'sound': S.settings.sound = arg !== 'off'; save(); applyTheme(); break;
+    case 'case':
+      if (/^(upper|caps|off)$/i.test(arg)) S.settings.mixedCase = false;
+      else if (/^(mixed|lower|on)$/i.test(arg)) S.settings.mixedCase = true;
+      else S.settings.mixedCase = !S.settings.mixedCase;
+      save(); applyTheme();
+      note('TYPING: ' + (S.settings.mixedCase ? 'UPPER AND LOWER CASE' : 'CAPITALS ONLY'), { small: true }); break;
     case 'boot': S.settings.quickBoot = arg === 'quick'; save(); note('BOOT SEQUENCE: ' + (S.settings.quickBoot ? 'QUICK' : 'FULL'), { small: true }); break;
     case 'reboot': location.reload(); break;
     case 'logoff': case 'exit': case 'quit': shutdown(); break;
@@ -2131,6 +2150,7 @@ function bindUI() {
     save(); applyTheme(); beep(700, 0.05);
   };
   $('#btn-sound').onclick = () => { S.settings.sound = !S.settings.sound; save(); applyTheme(); beep(700, 0.05); };
+  $('#btn-case').onclick = () => { S.settings.mixedCase = !S.settings.mixedCase; save(); applyTheme(); beep(700, 0.05); $('#input').focus(); };
   $('#btn-left').onclick = () => $('#left').classList.toggle('open');
   $('#btn-right').onclick = () => $('#right').classList.toggle('open');
   $('#board').onclick = () => { if (!TH.on && !busy) runBigBoard(); };
@@ -2165,7 +2185,7 @@ async function checkBuild() {
 }
 
 /* ---------- go ---------- */
-document.body.className = 'theme-' + S.settings.theme;
+document.body.className = 'theme-' + S.settings.theme + (S.settings.mixedCase ? ' mixed-case' : '');
 WHERE.setup({
   get: () => S.settings.place || null,
   set: (p) => { S.settings.place = p; save(); },
