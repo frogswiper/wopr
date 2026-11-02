@@ -1834,7 +1834,7 @@ function notToPlay() {
   if (busy) return note('BUSY. ESC TO ABORT FIRST.', { small: true });
   stopVoice();
   beep(440, 0.12, 'square', 0.04); beep(330, 0.25, 'square', 0.04, 0.14);
-  wline('The only way to win is by not to play!');
+  wline('The only winning move is not to play.');
 }
 const TRIGGERS = [
   [/^(list|show|help)\s+games$/i, () => listGames()],
