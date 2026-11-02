@@ -338,7 +338,10 @@ async function pump() {
           if (V.queue[1] && V.queue[1].eng === 'server') fetchTTS(V.queue[1]);
           const buf = await item.p;
           if (item.gen === V.gen) await playBuffer(buf);
-        } else {
+        } else if (await browserSay(item.text) === 'blocked' && item.gen === V.gen) {
+          // Chrome refuses speech before the first key press or click: wait for one, then say it.
+          V.gesture = false;
+          await waitGesture();
           await browserSay(item.text);
         }
       } catch {
@@ -377,9 +380,10 @@ function browserSay(text) {
     u.rate = Math.max(0.5, Math.min(1.6, v.rate / 165));
     u.pitch = Math.max(0, Math.min(2, v.pitch / 55));
     let done = false;
-    const fin = () => { if (!done) { done = true; clearTimeout(t); V.level = 0; resolve(); } };
+    const fin = (r) => { if (!done) { done = true; clearTimeout(t); V.level = 0; resolve(r); } };
     const t = setTimeout(fin, 3000 + text.length * 140);
-    u.onend = fin; u.onerror = fin;
+    u.onend = () => fin();
+    u.onerror = (e) => fin(e && e.error === 'not-allowed' ? 'blocked' : undefined);
     u.onboundary = () => { V.level = 0.35; setTimeout(() => { V.level = 0.05; }, 120); };
     speechSynthesis.speak(u);
   });

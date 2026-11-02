@@ -55,7 +55,7 @@ The Windows installer:
 7. installs W.O.P.R. to `%LOCALAPPDATA%\wopr\app`, saves settings to `%APPDATA%\wopr\wopr.env`, adds
    **Start Menu and desktop shortcuts** and the `wopr` command (new terminals), then launches it
 
-It opens full screen in its own **Edge** kiosk window (Chrome or Brave if Edge is missing), with
+It opens full screen in its own **Chrome** kiosk window (Edge if Chrome isn't installed, then Brave), with
 autoplay allowed. Esc exits; Alt+F4 also works. Set options the same way as on Linux, e.g.
 `$env:WOPR_MODEL = 'glm-5.2:cloud'; irm … | iex`. Run the one-liner again to update.
 
@@ -63,12 +63,24 @@ autoplay allowed. Esc exits; Alt+F4 also works. Set options the same way as on L
 
     wopr                # starts server.js if needed and opens W.O.P.R. full screen
 
-`wopr` opens its own **full-screen kiosk window** with a dedicated Firefox or Chromium/Chrome profile.
+`wopr` opens its own **full-screen kiosk window** with a dedicated browser profile.
 Audio is allowed without a click, so Joshua can speak first.
 **Press Esc to log off.** Esc stops a reply or a speech first. When idle, it shuts down W.O.P.R.
 and closes the window. `/logoff` does the same, and Alt+F4 also works.
 `WOPR_BROWSER=default wopr` opens a normal browser tab instead. In a normal tab the voice
 starts after your first key press.
+
+Browsers: Firefox and every Chromium-family browser (Chrome, Chromium, Brave, Edge, Vivaldi) work. Each
+gets its own profile, with sound allowed and location pre-allowed for this page only, so no prompts appear.
+Pick one with `WOPR_BROWSER` (in the shell, or in the settings file):
+
+| `WOPR_BROWSER` | Linux / macOS | Windows |
+|---|---|---|
+| `auto` (default) | Firefox, else Chrome/Chromium/Brave/Edge | Chrome, else Edge, else Brave |
+| `chrome` | a Chromium-family browser | Chrome |
+| `firefox` | Firefox | — |
+| `edge` / `brave` | — | that browser |
+| `default` | a normal tab in the default browser | a normal tab |
 
 ## What's inside
 

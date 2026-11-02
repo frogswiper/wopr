@@ -18,25 +18,28 @@ if ! curl -s -o /dev/null "${URL}wopr.json"; then
 fi
 
 # Kiosk window with a dedicated browser profile: separate window, full screen, no browser chrome,
-# and audio allowed without a click so Joshua can speak first. Leave with Alt+F4.
-# WOPR_BROWSER=default opens a normal tab in the default browser instead.
+# audio allowed without a click (so Joshua can speak first) and location allowed for this page only.
+# Leave with Esc (or Alt+F4).
+#   WOPR_BROWSER=auto      Firefox, else Chrome / Chromium / Brave / Edge   (default)
+#   WOPR_BROWSER=chrome    a Chromium-family browser only
+#   WOPR_BROWSER=firefox   Firefox only
+#   WOPR_BROWSER=default   a normal tab in the desktop's default browser
 open_default() {
   if command -v xdg-open >/dev/null; then xdg-open "$URL" >/dev/null 2>&1 &
   elif command -v open >/dev/null; then open "$URL"
   else echo "W.O.P.R. is running at $URL"; fi
 }
 
-if [ "${WOPR_BROWSER:-}" = "default" ]; then
-  open_default
-elif command -v firefox >/dev/null; then
+is_snap() {   # Ubuntu ships /usr/bin/firefox and /usr/bin/chromium-browser as wrappers around snaps
+  local p; p="$(command -v "$1")" || return 1
+  readlink -f "$p" | grep -q '^/snap/' || grep -qs "/snap/bin/" "$p"
+}
+
+open_firefox() {
+  command -v firefox >/dev/null || return 1
   # Snap Firefox cannot read hidden directories, so its profile lives under ~/snap.
-  # Ubuntu's /usr/bin/firefox is a shell wrapper around /snap/bin/firefox, not a symlink.
-  ff="$(command -v firefox)"
-  if readlink -f "$ff" | grep -q '^/snap/' || { [ -x /snap/bin/firefox ] && grep -qs '/snap/bin/firefox' "$ff"; }; then
-    PROFILE="$HOME/snap/firefox/common/wopr-profile"
-  else
-    PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/firefox-profile"
-  fi
+  if is_snap firefox; then PROFILE="$HOME/snap/firefox/common/wopr-profile"
+  else PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/firefox-profile"; fi
   mkdir -p "$PROFILE"
   cat > "$PROFILE/user.js" <<'PREFS'
 user_pref("media.autoplay.default", 0);
@@ -57,14 +60,34 @@ user_pref("dom.allow_scripts_to_close_windows", true);
 user_pref("permissions.default.geo", 1);
 PREFS
   nohup firefox --profile "$PROFILE" --kiosk --new-window "$URL" >/dev/null 2>&1 &
-else
-  for b in chromium chromium-browser google-chrome google-chrome-stable brave-browser microsoft-edge; do
-    if command -v "$b" >/dev/null; then
-      nohup "$b" --user-data-dir="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/chromium-profile" \
-        --kiosk --app="$URL" --autoplay-policy=no-user-gesture-required \
-        --no-first-run --no-default-browser-check >/dev/null 2>&1 &
-      exit 0
+}
+
+open_chromium() {
+  local b s
+  for b in google-chrome google-chrome-stable chromium chromium-browser brave-browser microsoft-edge microsoft-edge-stable vivaldi; do
+    command -v "$b" >/dev/null || continue
+    if is_snap "$b"; then   # snaps may only write under ~/snap/<snap name>
+      case "$b" in chromium*) s=chromium ;; brave*) s=brave ;; *) s="$b" ;; esac
+      PROFILE="$HOME/snap/$s/common/wopr-profile"
+    else PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/wopr/chromium-profile"; fi
+    mkdir -p "$PROFILE/Default"
+    # First run: pre-allow location for this page and skip the welcome / restore bubbles.
+    if [ ! -s "$PROFILE/Default/Preferences" ]; then
+      printf '{"profile":{"exit_type":"Normal","exited_cleanly":true,"content_settings":{"exceptions":{"geolocation":{"http://127.0.0.1:%s,*":{"setting":1}}}}},"browser":{"check_default_browser":false,"has_seen_welcome_page":true},"translate":{"enabled":false}}\n' "$PORT" > "$PROFILE/Default/Preferences"
+    else
+      sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' "$PROFILE/Default/Preferences"
     fi
+    nohup "$b" --user-data-dir="$PROFILE" --kiosk --app="$URL" --autoplay-policy=no-user-gesture-required \
+      --no-first-run --no-default-browser-check --password-store=basic --disable-features=Translate \
+      --disable-session-crashed-bubble >/dev/null 2>&1 &
+    return 0
   done
-  open_default
-fi
+  return 1
+}
+
+case "${WOPR_BROWSER:-auto}" in
+  default) open_default ;;
+  firefox) open_firefox || open_default ;;
+  chrome|chromium) open_chromium || open_default ;;
+  *) open_firefox || open_chromium || open_default ;;
+esac

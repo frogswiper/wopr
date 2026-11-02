@@ -34,27 +34,45 @@ if (-not (Test-Up)) {
   for ($i = 0; $i -lt 40 -and -not (Test-Up); $i++) { Start-Sleep -Milliseconds 250 }
 }
 
-# Full-screen kiosk window with its own browser profile and audio allowed without a click.
-# Leave with Esc (logs off) or Alt+F4.  WOPR_BROWSER=default opens a normal tab instead.
-function Find-Browser {
-  $c = @(
-    (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
-    (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
-    (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path $env:ProgramFiles 'BraveSoftware\Brave-Browser\Application\brave.exe'),
-    (Join-Path $env:LOCALAPPDATA 'BraveSoftware\Brave-Browser\Application\brave.exe')
-  )
-  foreach ($p in $c) { if ($p -and (Test-Path $p)) { return $p } }
+# Full-screen kiosk window with its own browser profile, audio allowed without a click and location
+# allowed for this page only. Leave with Esc or Alt+F4.
+#   WOPR_BROWSER = auto (Chrome, else Edge, else Brave) | chrome | edge | brave | default (normal tab)
+function Find-Browser($want) {
+  $all = [ordered]@{
+    chrome = @((Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
+               (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
+               (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe'))
+    edge   = @((Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+               (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'))
+    brave  = @((Join-Path $env:ProgramFiles 'BraveSoftware\Brave-Browser\Application\brave.exe'),
+               (Join-Path $env:LOCALAPPDATA 'BraveSoftware\Brave-Browser\Application\brave.exe'))
+  }
+  $order = @('chrome', 'edge', 'brave')
+  if ($want -and $all.Contains($want)) { $order = @($want) + ($order | Where-Object { $_ -ne $want }) }
+  foreach ($k in $order) { foreach ($p in $all[$k]) { if ($p -and (Test-Path $p)) { return $p } } }
   return $null
 }
+$Want = ''; if ($env:WOPR_BROWSER) { $Want = $env:WOPR_BROWSER.ToLower() }
 $Browser = $null
-if ($env:WOPR_BROWSER -ne 'default') { $Browser = Find-Browser }
+if ($Want -ne 'default') { $Browser = Find-Browser $Want }
 if ($Browser) {
   $Prof = Join-Path $Data 'browser-profile'
+  $Pref = Join-Path $Prof 'Default\Preferences'
+  $utf8 = New-Object System.Text.UTF8Encoding $false
+  if (-not (Test-Path $Pref) -or (Get-Item $Pref).Length -eq 0) {
+    # First run: pre-allow location for this page and skip the welcome / restore bubbles.
+    New-Item -ItemType Directory -Force -Path (Join-Path $Prof 'Default') | Out-Null
+    $json = '{"profile":{"exit_type":"Normal","exited_cleanly":true,"content_settings":{"exceptions":{"geolocation":{"http://127.0.0.1:' + $Port +
+            ',*":{"setting":1}}}}},"browser":{"check_default_browser":false,"has_seen_welcome_page":true},"translate":{"enabled":false}}'
+    [IO.File]::WriteAllText($Pref, $json, $utf8)
+  } else {
+    $txt = [IO.File]::ReadAllText($Pref)
+    $fixed = $txt.Replace('"exit_type":"Crashed"', '"exit_type":"Normal"').Replace('"exited_cleanly":false', '"exited_cleanly":true')
+    if ($fixed -ne $txt) { [IO.File]::WriteAllText($Pref, $fixed, $utf8) }
+  }
   $a = @("--user-data-dir=`"$Prof`"", '--no-first-run', '--no-default-browser-check',
-         '--autoplay-policy=no-user-gesture-required', '--disable-features=Translate', '--kiosk', $Url)
+         '--autoplay-policy=no-user-gesture-required', '--disable-features=Translate', '--disable-session-crashed-bubble',
+         '--kiosk', $Url)
   if ($Browser -like '*msedge.exe') { $a += '--edge-kiosk-type=fullscreen' }
   Start-Process -FilePath $Browser -ArgumentList $a
 } else {
