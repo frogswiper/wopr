@@ -167,13 +167,19 @@ fi
 
 # ---------- 7. W.O.P.R. ----------
 say "DOWNLOADING W.O.P.R. ($REPO@$BRANCH)"
+# Install an exact commit and remember it, so updates can tell what is installed.
+SHA="$(curl -fsSL --max-time 20 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null || true)"
+printf '%s' "$SHA" | grep -qE '^[0-9a-f]{40}$' || SHA=""
 tmpapp="$(mktemp -d)"
-curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar -xz --strip-components=1 -C "$tmpapp"
+curl -fsSL "https://codeload.github.com/$REPO/tar.gz/${SHA:-refs/heads/$BRANCH}" | tar -xz --strip-components=1 -C "$tmpapp"
 [ -f "$tmpapp/server.js" ] || die "download did not contain server.js"
-rm -rf "$APP"; mkdir -p "$DATA"; mv "$tmpapp" "$APP"; chmod +x "$APP/wopr"
-ok "$APP"
+echo "${SHA:-unknown}" > "$tmpapp/.version"
+rm -rf "$APP" "$DATA/staged"; mkdir -p "$DATA"; mv "$tmpapp" "$APP"; chmod +x "$APP/wopr" "$APP/update.sh"
+ok "$APP (version ${SHA:0:7})"
 
 mkdir -p "$CONF_DIR"
+# Settings this installer does not manage (e.g. WOPR_BROWSER=chrome) are kept.
+KEEP="$(grep -vE '^(#|WOPR_MODEL=|WOPR_NODE=|OLLAMA_URL=|WOPR_PORT=|WOPR_TTS=|ESPEAK_DATA_PATH=)' "$CONF_DIR/wopr.env" 2>/dev/null | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' || true)"
 {
   echo "# Written by the W.O.P.R. installer. Edit and restart W.O.P.R. to change."
   echo "WOPR_MODEL=$MODEL"
@@ -181,6 +187,7 @@ mkdir -p "$CONF_DIR"
   echo "OLLAMA_URL=$OLLAMA_URL"
   if [ -n "$ESPEAK" ]; then echo "WOPR_TTS=$ESPEAK"; fi
   if [ -n "${WOPR_PORT:-}" ]; then echo "WOPR_PORT=$WOPR_PORT"; fi
+  if [ -n "$KEEP" ]; then echo "$KEEP"; fi
 } > "$CONF_DIR/wopr.env"
 ok "config $CONF_DIR/wopr.env"
 

@@ -18,8 +18,25 @@ $Data = Join-Path $env:LOCALAPPDATA 'wopr'
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $Log = Join-Path $Data 'wopr.log'
 
+# ---------- updates (installed copies only: the installer writes .version) ----------
+if ($args -contains '--update') { & (Join-Path $Dir 'update.ps1'); return }
+$Staged = Join-Path $Data 'staged'
+
 function Test-Up {
   try { $null = Invoke-WebRequest -UseBasicParsing -Uri "$($Url)wopr.json" -TimeoutSec 2 -ErrorAction Stop; return $true } catch { return $false }
+}
+
+if (-not (Test-Up) -and (Test-Path (Join-Path $Dir '.version')) -and (Split-Path -Leaf $Dir) -eq 'app' -and
+    (Test-Path (Join-Path $Staged 'server.js'))) {
+  # A newer version was downloaded in the background last time. Nothing is running: switch to it.
+  Set-Location $Data
+  $old = Join-Path $Data 'app.old'
+  try {
+    if (Test-Path $old) { Remove-Item $old -Recurse -Force -ErrorAction Stop }
+    Rename-Item -Path $Dir -NewName 'app.old' -ErrorAction Stop
+    try { Rename-Item -Path $Staged -NewName 'app' -ErrorAction Stop } catch { Rename-Item -Path $old -NewName 'app'; throw }
+    Remove-Item $old -Recurse -Force -ErrorAction SilentlyContinue
+  } catch { Add-Content -Path $Log -Value "update not applied yet (will retry next start): $($_.Exception.Message)" -ErrorAction SilentlyContinue }
 }
 
 if (-not (Test-Up)) {
@@ -77,4 +94,10 @@ if ($Browser) {
   Start-Process -FilePath $Browser -ArgumentList $a
 } else {
   Start-Process $Url
+}
+
+# Look for a newer version in the background; it is only switched in at the next start.
+if ((Test-Path (Join-Path $Dir '.version')) -and $env:WOPR_AUTO_UPDATE -ne '0') {
+  $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+  Start-Process -FilePath $ps -WorkingDirectory $Data -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$(Join-Path $Dir 'update.ps1')`"", '--stage'
 }

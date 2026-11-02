@@ -12,6 +12,20 @@ NODE="${WOPR_NODE:-node}"
 LOG="${XDG_CACHE_HOME:-$HOME/.cache}/wopr.log"
 mkdir -p "$(dirname "$LOG")"
 
+# ---------- updates (installed copies only: the installer writes .version) ----------
+DATA_DIR="$(dirname "$DIR")"
+if [ "${1:-}" = "--update" ]; then exec bash "$DIR/update.sh"; fi
+if [ -f "$DIR/.version" ] && [ "$(basename "$DIR")" = app ] && [ -f "$DATA_DIR/staged/server.js" ] \
+   && ! curl -s -o /dev/null "${URL}wopr.json"; then
+  # A newer version was downloaded in the background last time. Nothing is running: switch to it.
+  rm -rf "$DATA_DIR/app.old"
+  if mv "$DIR" "$DATA_DIR/app.old" && mv "$DATA_DIR/staged" "$DIR"; then
+    rm -rf "$DATA_DIR/app.old"
+    exec "$DIR/wopr" "$@"
+  fi
+  [ -d "$DIR" ] || mv "$DATA_DIR/app.old" "$DIR"
+fi
+
 if ! curl -s -o /dev/null "${URL}wopr.json"; then
   nohup "$NODE" "$DIR/server.js" > "$LOG" 2>&1 &
   for _ in $(seq 25); do curl -s -o /dev/null "${URL}wopr.json" && break; sleep 0.2; done
@@ -93,3 +107,8 @@ case "${WOPR_BROWSER:-auto}" in
   chrome|chromium) open_chromium || open_default ;;
   *) open_firefox || open_chromium || open_default ;;
 esac
+
+# Look for a newer version in the background; it is only switched in at the next start.
+if [ -f "$DIR/.version" ] && [ "${WOPR_AUTO_UPDATE:-1}" != 0 ]; then
+  nohup bash "$DIR/update.sh" --stage >> "${XDG_CACHE_HOME:-$HOME/.cache}/wopr-update.log" 2>&1 &
+fi

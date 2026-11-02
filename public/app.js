@@ -785,6 +785,7 @@ async function startMain() {
   setInterval(tickClock, 1000); tickClock();
   startLamps();
   startScope();
+  checkBuild(); setInterval(checkBuild, 5 * 60e3);
   startBoard();
   WHERE.loadWeather(); setInterval(WHERE.loadWeather, 15 * 60e3);
   updateTelemetry(null);
@@ -2151,6 +2152,16 @@ async function runBigBoard() {
   } catch { /* ESC */ }
   $('#th-skip').textContent = 'ESC: ABORT SIMULATION';
   thClose();
+}
+
+// Footer: installed build, and a notice when a newer version has been downloaded (applied at next start).
+async function checkBuild() {
+  const j = await getJSON('/wopr.json', 3000).catch(() => null);
+  const el = $('#foot-ver');
+  if (!j || !el) return;
+  const v = j.version === 'dev' ? 'DEV' : String(j.version || '?').slice(0, 7).toUpperCase();
+  const st = j.staged && j.staged !== j.version ? String(j.staged).slice(0, 7).toUpperCase() : '';
+  el.innerHTML = 'BUILD ' + esc(v) + (st ? ` · <b class="upd">UPDATE ${esc(st)} READY · RESTART TO APPLY</b>` : '');
 }
 
 /* ---------- go ---------- */

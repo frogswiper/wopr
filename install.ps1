@@ -224,17 +224,32 @@ try {
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -and $_.CommandLine.Contains($oldServer) } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  # Install an exact commit and remember it, so updates can tell what is installed.
+  $Sha = $null
+  try { $Sha = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/commits/$Branch" -TimeoutSec 20 -ErrorAction Stop).sha } catch { $Sha = $null }
+  if ($Sha -notmatch '^[0-9a-f]{40}$') { $Sha = $null }
+  $ref = "refs/heads/$Branch"; if ($Sha) { $ref = $Sha }
   $tmp = Join-Path $env:TEMP ('wopr-app-' + [guid]::NewGuid())
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-  Get-File "https://codeload.github.com/$Repo/zip/refs/heads/$Branch" (Join-Path $tmp 'app.zip')
+  Get-File "https://codeload.github.com/$Repo/zip/$ref" (Join-Path $tmp 'app.zip')
   Expand-Archive -Path (Join-Path $tmp 'app.zip') -DestinationPath $tmp -Force
   $inner = Get-ChildItem -Path $tmp -Directory | Select-Object -First 1
   if (-not $inner -or -not (Test-Path (Join-Path $inner.FullName 'server.js'))) { Die 'download did not contain server.js' }
-  if (Test-Path $App) { Remove-Item $App -Recurse -Force }
+  $ver = 'unknown'; if ($Sha) { $ver = $Sha }
+  Set-Content -Path (Join-Path $inner.FullName '.version') -Value $ver -Encoding ASCII
+  Set-Location $Data
+  foreach ($d in @($App, (Join-Path $Data 'staged'))) { if (Test-Path $d) { Remove-Item $d -Recurse -Force } }
   Move-Item -Path $inner.FullName -Destination $App
   Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-  Ok $App
+  $short = 'unknown'; if ($Sha) { $short = $Sha.Substring(0, 7) }
+  Ok "$App (version $short)"
 
+  # Settings this installer does not manage (e.g. WOPR_BROWSER=chrome) are kept.
+  $confFile = Join-Path $ConfDir 'wopr.env'
+  $keep = @()
+  if (Test-Path $confFile) {
+    $keep = @(Get-Content $confFile | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' -and $_ -notmatch '^(WOPR_MODEL|WOPR_NODE|OLLAMA_URL|WOPR_PORT|WOPR_TTS|ESPEAK_DATA_PATH)=' })
+  }
   $conf = @(
     '# Written by the W.O.P.R. installer. Edit and restart W.O.P.R. to change.',
     "WOPR_MODEL=$Model",
@@ -244,6 +259,7 @@ try {
   if ($Espeak) { $conf += "WOPR_TTS=$Espeak" }
   if ($EspeakData) { $conf += "ESPEAK_DATA_PATH=$EspeakData" }
   if ($env:WOPR_PORT) { $conf += "WOPR_PORT=$($env:WOPR_PORT)" }
+  $conf += $keep
   Set-Content -Path (Join-Path $ConfDir 'wopr.env') -Value $conf -Encoding ASCII
   Ok "config $(Join-Path $ConfDir 'wopr.env')"
 
@@ -255,7 +271,7 @@ try {
     $lnk = $ws.CreateShortcut((Join-Path $dir 'WOPR.lnk'))
     $lnk.TargetPath = $ps
     $lnk.Arguments = $launch
-    $lnk.WorkingDirectory = $App
+    $lnk.WorkingDirectory = $Data      # not the app folder: updates rename it
     $lnk.IconLocation = (Join-Path $App 'public\wopr.ico')
     $lnk.Description = 'Shall we play a game? NORAD war-room terminal for Ollama'
     $lnk.WindowStyle = 7

@@ -59,6 +59,24 @@ It opens full screen in its own **Chrome** kiosk window (Edge if Chrome isn't in
 autoplay allowed. Esc exits; Alt+F4 also works. Set options the same way as on Linux, e.g.
 `$env:WOPR_MODEL = 'glm-5.2:cloud'; irm … | iex`. Run the one-liner again to update.
 
+## Update to the latest version
+
+| | |
+|---|---|
+| **Linux / macOS** | `curl -fsSL https://raw.githubusercontent.com/frogswiper/wopr/main/update.sh \| bash` |
+| **Windows** (PowerShell) | `irm https://raw.githubusercontent.com/frogswiper/wopr/main/update.ps1 \| iex` |
+| from an installed copy | `wopr --update` |
+
+**W.O.P.R. also updates itself.** Every time it starts, it checks GitHub in the background. If there is a newer
+version, it downloads it into a separate folder next to the running one (`~/.local/share/wopr/staged`, or
+`%LOCALAPPDATA%\wopr\staged` on Windows). Nothing changes while you use it. At the next start, before anything runs,
+the launcher switches to the new version. The footer shows the installed build and
+**UPDATE … READY · RESTART TO APPLY** once one is waiting. Your settings, logs and browser profile are kept.
+To turn this off, add `WOPR_AUTO_UPDATE=0` to `~/.config/wopr/wopr.env` (Windows: `%APPDATA%\wopr\wopr.env`).
+The update commands above apply an update straight away if W.O.P.R. is not running.
+
+Re-running the installer also updates. It additionally refreshes Ollama, the model and Node.js.
+
 ## Run
 
     wopr                # starts server.js if needed and opens W.O.P.R. full screen
